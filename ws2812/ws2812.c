@@ -11,8 +11,10 @@
 #include "hardware/pio.h"
 #include "hardware/clocks.h"
 #include "ws2812.pio.h"
+#include "buffdraw.h"
+#include "symbol.h"
 
-#define N 21
+#define N BUFFER_LENGTH/2
 
 static inline void put_pixel1(PIO pio, uint32_t pixel_grb) {
     pio_sm_put_blocking(pio, 0, pixel_grb << 8u);
@@ -98,6 +100,36 @@ void pattern_snakes(PIO pio, uint len, uint t) {
     }
 }
 
+void pattern_symbol(PIO pio, uint len, uint t) {
+    uint8_t buffer[ BUFFER_WIDTH * BUFFER_HEIGHT ];
+    uint32_t rgb_color;
+    u_int8_t startIdx = (pio==pio0)?0:N;
+    getSymbol(buffer, sym_rhomoid);
+    for (int i = startIdx; i < len+startIdx; ++i) {
+        switch(buffer[i]){
+        //if(!(i%70)){
+            case 1:
+            rgb_color = urgb_u32(0x99, 0, 0);
+            break;
+            case 2:
+            rgb_color = urgb_u32(0, 0x99, 0);
+            break;
+            case 3:
+            rgb_color = urgb_u32(0, 0, 0x99);
+            break;
+            default:
+            rgb_color = urgb_u32(0, 0, 0);;
+            break;
+        }
+        put_pixel1(pio, rgb_color);
+    }
+}
+
+void pattern_nuj(PIO pio, uint len, uint t) {
+    for (int i = 0; i <28; ++i)
+        put_pixel1(pio,  urgb_u32(0x55, 0, 0));
+}
+
 void pattern_random(PIO pio, uint len, uint t) {
     if (t % 8)
         return;
@@ -127,18 +159,33 @@ void pattern_vitulak(PIO pio, uint len, uint t) {
         put_pixel1(pio, rand() / 0x0a0a0a05);
     }
 }
+void pattern_testik(PIO pio, uint len, uint t) {
+    u_int8_t r;
+    for (int i = 0; i < 8*7; ++i){
+        if(i<6) {
+            r=i*10;
+        } else {
+            r=0;
+        }
+        put_pixel1(pio, urgb_u32(r, 0, 0));
+    }
+}
 
 typedef void (*pattern)(PIO pio, uint len, uint t);
 const struct {
     pattern pat;
     const char *name;
 } pattern_table[] = {
-        {pattern_rainbow,  "Rainbow"},
+        {pattern_rainbow,  "rainbow"},
+        {pattern_nuj,  "nuj"},
         {pattern_snakes,  "Snakes!"},
         {pattern_random,  "Random data"},
         {pattern_sparkle, "Sparkles"},
         {pattern_greys,   "Greys"},
-        {pattern_vitulak, "Vitulak zije!"}
+        {pattern_vitulak, "Vitulak zije!"},
+        {pattern_symbol, "Symbol"},
+        {pattern_testik, "Testik"},
+
 };
 
 const int PIN_TX = 15;
@@ -165,8 +212,8 @@ int main() {
     uint offset = pio_add_program(pioA, &ws2812_program);
     uint offset1 = pio_add_program(pioB, &ws2812_program);
 
-    ws2812_program_init(pioA, sm, offset, PIN_TX, 800000, true);
-    ws2812_program_init(pioB, sm, offset1, PIN_TX1, 800000, true);
+    ws2812_program_init(pioA, sm, offset, PIN_TX, 800000, false);
+    ws2812_program_init(pioB, sm, offset1, PIN_TX1, 800000, false);
 /*
     for(int i = 0; i < 4; i++){
         put_pixel1(pioB, urgb_u32(0x20, 0x20, 0x00));

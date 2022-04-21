@@ -286,7 +286,7 @@ int main() {
     int sm = 0;
     uint offset = pio_add_program(pio, &ws2812_parallel_program);
 
-    ws2812_parallel_program_init(pio, sm, offset, PIN_TX, count_of(strings), 800000);
+    ws2812_parallel_program_init(pio, sm, offset, PIN_TX, count_of(strings), 800000, false);
 
     sem_init(&reset_delay_complete_sem, 1, 1); // initially posted so we don't block first time
     dma_init(pio, sm);
