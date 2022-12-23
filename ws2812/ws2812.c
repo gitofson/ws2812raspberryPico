@@ -14,7 +14,10 @@
 #include "buffdraw.h"
 #include "symbol.h"
 
-#define N BUFFER_LENGTH/2
+#include "picowota/reboot.h"
+
+#define N 490
+//BUFFER_LENGTH/2
 
 static inline void put_pixel1(PIO pio, uint32_t pixel_grb) {
     pio_sm_put_blocking(pio, 0, pixel_grb << 8u);
@@ -87,13 +90,14 @@ void pattern_rainbow(PIO pio, uint len, uint t){
     ++angle;
 }
 void pattern_snakes(PIO pio, uint len, uint t) {
+    uint snake_len=3;
     for (uint i = 0; i < len; ++i) {
         uint x = (i + (t >> 1)) % 64;
-        if (x < 10)
+        if (x < snake_len)
             put_pixel1(pio, urgb_u32(0x5f, 0, 0));
-        else if (x >= 15 && x < 25)
+        else if (x >= 15 && x < 15+snake_len)
             put_pixel1(pio, urgb_u32(0, 0x5f, 0));
-        else if (x >= 30 && x < 40)
+        else if (x >= 30 && x < 30+snake_len)
             put_pixel1(pio, urgb_u32(0, 0, 0x5f));
         else
             put_pixel1(pio, 0);
@@ -101,33 +105,70 @@ void pattern_snakes(PIO pio, uint len, uint t) {
 }
 
 void pattern_symbol(PIO pio, uint len, uint t) {
-    uint8_t buffer[ BUFFER_WIDTH * BUFFER_HEIGHT ];
+    uint8_t buffer[ BD_BUFFER_LENGTH ];
     uint32_t rgb_color;
-    u_int8_t startIdx = (pio==pio0)?0:N;
-    getSymbol(buffer, sym_rhomoid);
+    uint32_t startIdx = (pio==pio0)?0:BD_BUFFER_LENGTH/2;
+    getSymbol(buffer, sym_test/*sym_test*//*sym_rhomoid*/);
     for (int i = startIdx; i < len+startIdx; ++i) {
-        switch(buffer[i]){
-        //if(!(i%70)){
-            case 1:
-            rgb_color = urgb_u32(0x99, 0, 0);
-            break;
-            case 2:
-            rgb_color = urgb_u32(0, 0x99, 0);
-            break;
-            case 3:
-            rgb_color = urgb_u32(0, 0, 0x99);
-            break;
-            default:
-            rgb_color = urgb_u32(0, 0, 0);;
-            break;
+        if(i < BD_BUFFER_LENGTH){
+            switch(buffer[i]){
+            //if(!(i%70)){
+                case 1:
+                rgb_color = urgb_u32(0x19, 0, 0);
+                break;
+                case 2:
+                rgb_color = urgb_u32(0, 0x19, 0);
+                break;
+                case 3:
+                rgb_color = urgb_u32(0, 0, 0x19);
+                break;
+                default:
+                rgb_color = urgb_u32(0, 0, 0);;
+                break;
+            }
+            put_pixel1(pio, rgb_color);
         }
-        put_pixel1(pio, rgb_color);
+    }
+}
+void pattern_christmas_tree(PIO pio, uint len, uint t) {
+    uint8_t buffer[ BD_BUFFER_LENGTH ];
+    uint32_t rgb_color;
+    uint32_t startIdx = (pio==pio0)?0:BD_BUFFER_LENGTH/2;
+    getSymbol(buffer, sym_christmas_tree);
+    for (int i = startIdx; i < len+startIdx; ++i) {
+        if(i < BD_BUFFER_LENGTH){
+            switch(buffer[i]){
+            //if(!(i%70)){
+                case '~':
+                    rgb_color = urgb_u32(0x00, rand() % 0x19, 0);
+                    break;
+                case '/':
+                    rgb_color = urgb_u32(0x01, 0x11, 0x01);
+                    break;
+                case '*':
+                    rgb_color = urgb_u32(rand() % 0xa0, 0, 0);
+                    break;
+                case '$':
+                    rgb_color = urgb_u32(0, rand() % 0xa0, 0);
+                    break;
+                case '#':
+                    rgb_color = urgb_u32(0, 0, rand() % 0xa0);
+                    break;
+                case '|':
+                    rgb_color = urgb_u32(28,25,21);
+                    break;
+                default:
+                    rgb_color = urgb_u32(0, 0, 0);;
+                    break;
+            }
+            put_pixel1(pio, rgb_color);
+        }
     }
 }
 
-void pattern_nuj(PIO pio, uint len, uint t) {
-    for (int i = 0; i <28; ++i)
-        put_pixel1(pio,  urgb_u32(0x55, 0, 0));
+void pattern_clear(PIO pio, uint len, uint t) {
+    for (int i = 0; i < len; ++i)
+        put_pixel1(pio,  0);
 }
 
 void pattern_random(PIO pio, uint len, uint t) {
@@ -177,13 +218,15 @@ const struct {
     const char *name;
 } pattern_table[] = {
         {pattern_rainbow,  "rainbow"},
-        {pattern_nuj,  "nuj"},
         {pattern_snakes,  "Snakes!"},
+        {pattern_christmas_tree, "Xmass tree"},
+        {pattern_symbol, "Symbol"},
+        // {pattern_nuj,  "nuj"},
         {pattern_random,  "Random data"},
         {pattern_sparkle, "Sparkles"},
         {pattern_greys,   "Greys"},
         {pattern_vitulak, "Vitulak zije!"},
-        {pattern_symbol, "Symbol"},
+        
         {pattern_testik, "Testik"},
 
 };
@@ -197,9 +240,12 @@ int main() {
     gpio_set_input_enabled(10, true);
     gpio_set_dir(11, GPIO_IN);
     gpio_set_input_enabled(11, true);
+    gpio_set_dir(28, GPIO_IN);
+    gpio_set_input_enabled(28, true);
     //set gpio pull ups
     gpio_pull_up(10);
     gpio_pull_up(11);
+    gpio_pull_up(28);
 
     //set_sys_clock_48();
     stdio_init_all();
@@ -221,7 +267,7 @@ int main() {
 */
     int t = 0;
     int bt = 0;
-    int pat=0;
+    int pat = 2;
 lab001:
     while (1) {
         //int pat = rand() % count_of(pattern_table);
@@ -257,6 +303,11 @@ lab001:
                     bt=2;
                 }
                 goto lab001;
+            }
+            if(gpio_get(28)==0){
+                pattern_clear(pioA, N+10,0);
+                pattern_clear(pioB, N+10,0);
+                picowota_reboot(true);
             }
         }
         
